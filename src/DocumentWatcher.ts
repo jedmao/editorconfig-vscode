@@ -12,7 +12,6 @@ import {
 import { fromEditorConfig } from './Utils';
 import {
 	InsertFinalNewline,
-	OnOpenTransformation,
 	PreSaveTransformation,
 	SetEndOfLine,
 	TrimTrailingWhitespace
@@ -26,12 +25,10 @@ class DocumentWatcher implements EditorConfigProvider {
 	private docToConfigMap: { [fileName: string]: editorconfig.knownProps };
 	private disposable: Disposable;
 	private defaults: TextEditorOptions;
-	private onOpenTransformations: OnOpenTransformation[] = [
-		new SetEndOfLine()
-	];
 	private preSaveTransformations: PreSaveTransformation[] = [
 		new TrimTrailingWhitespace(),
-		new InsertFinalNewline()
+		new InsertFinalNewline(),
+		new SetEndOfLine()
 	];
 
 	constructor(
@@ -102,7 +99,7 @@ class DocumentWatcher implements EditorConfigProvider {
 
 		if (this.docToConfigMap[fileName]) {
 			this.log('Using configuration map...');
-			await this.applyEditorConfigToTextEditor(window.activeTextEditor);
+			this.applyEditorConfigToTextEditor(window.activeTextEditor);
 			return;
 		}
 
@@ -115,11 +112,11 @@ class DocumentWatcher implements EditorConfigProvider {
 
 				this.docToConfigMap[fileName] = config;
 
-				await this.applyEditorConfigToTextEditor(window.activeTextEditor);
+				this.applyEditorConfigToTextEditor(window.activeTextEditor);
 			});
 	}
 
-	private async applyEditorConfigToTextEditor(
+	private applyEditorConfigToTextEditor(
 		editor: TextEditor,
 	) {
 		if (!editor) {
@@ -136,28 +133,14 @@ class DocumentWatcher implements EditorConfigProvider {
 			return Promise.resolve();
 		}
 
-		const newOptions = fromEditorConfig(
+		editor.options = fromEditorConfig(
 			editorconfig,
 			this.getDefaultSettings()
 		);
 
-		// tslint:disable-next-line:no-any
-		editor.options = newOptions as any;
+		this.log(`${relativePath}: ${JSON.stringify(editor.options)}`);
 
-		const appliedOptions = { ...newOptions };
-
-		const result = await Promise.all(
-			this.onOpenTransformations.map(async transformer => {
-				Object.assign(
-					appliedOptions,
-					(await transformer.transform(editorconfig, editor)).applied
-				);
-			})
-		);
-
-		this.log(`${relativePath}: ${JSON.stringify(appliedOptions)}`);
-
-		return result;
+		return editor.options;
 	}
 
 	private onConfigChanged() {

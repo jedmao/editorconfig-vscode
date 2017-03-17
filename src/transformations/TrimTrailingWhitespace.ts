@@ -19,7 +19,7 @@ class TrimTrailingWhitespace extends PreSaveTransformation {
 		const editorTrimsWhitespace = workspace
 			.getConfiguration('files')
 			.get('trimTrailingWhitespace', false);
-		const trimmingOperations: TextEdit[] = [];
+		const edits: TextEdit[] = [];
 
 		if (editorTrimsWhitespace) {
 			if (editorconfig.trim_trailing_whitespace === false) {
@@ -28,22 +28,22 @@ class TrimTrailingWhitespace extends PreSaveTransformation {
 					'overriding the EditorConfig setting for this file.'
 				].join(' '));
 			}
-			return trimmingOperations;
+			return edits;
 		}
 
 		if (!editorconfig.trim_trailing_whitespace) {
-			return trimmingOperations;
+			return edits;
 		}
 
 		for (let i = 0; i < doc.lineCount; i++) {
 			const edit = this.trimLineTrailingWhitespace(doc.lineAt(i));
 
 			if (edit) {
-				trimmingOperations.push(edit);
+				edits.push(edit);
 			}
 		}
 
-		return trimmingOperations;
+		return edits;
 	}
 
 	private trimLineTrailingWhitespace(line: TextLine): TextEdit | void {

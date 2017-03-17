@@ -1,35 +1,20 @@
 import * as editorconfig from 'editorconfig';
-import {
-	EndOfLine,
-	TextEditor
-} from 'vscode';
+import { EndOfLineEdit } from 'vscode';
 
-import OnOpenTransformation from './OnOpenTransformation';
+import PreSaveTransformation from './PreSaveTransformation';
 
-class SetEndOfLine extends OnOpenTransformation {
+class SetEndOfLine extends PreSaveTransformation {
 
 	private eolMap = {
-		lf: EndOfLine.LF,
-		crlf: EndOfLine.CRLF
+		lf: EndOfLineEdit.LF,
+		crlf: EndOfLineEdit.CRLF
 	};
 
-	async transform(
-		editorconfig: editorconfig.knownProps,
-		editor: TextEditor
-	) {
-		const eolKey = (editorconfig.end_of_line || '').toLowerCase();
-		const eol = this.eolMap[eolKey.toLowerCase()];
-
-		if (!eol) {
-			return { success: false };
-		}
-
-		return {
-			applied: { eol: eolKey.toUpperCase() },
-			success: await editor.edit(edit => {
-				edit.setEndOfLine(eol);
-			})
-		};
+	transform(editorconfig: editorconfig.knownProps) {
+		const edit = this.eolMap[
+			(editorconfig.end_of_line || '').toLowerCase()
+		];
+		return (edit) ? [edit] : [];
 	}
 }
 
