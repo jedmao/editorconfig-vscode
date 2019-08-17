@@ -19,12 +19,15 @@ export async function resolveTextEditorOptions(
 		onBeforeResolve?: (relativePath: string) => void
 		onEmptyConfig?: (relativePath: string) => void
 	} = {},
-) {
+): Promise<[TextEditorOptions, ResolvedCoreConfig]> {
 	const editorconfigSettings = await resolveCoreConfig(doc, {
 		onBeforeResolve,
 	})
 	if (editorconfigSettings) {
-		return fromEditorConfig(editorconfigSettings, defaults)
+		return [
+			fromEditorConfig(editorconfigSettings, defaults),
+			editorconfigSettings,
+		]
 	}
 	if (onEmptyConfig) {
 		const rp = resolveFile(doc).relativePath
@@ -32,7 +35,7 @@ export async function resolveTextEditorOptions(
 			onEmptyConfig(rp)
 		}
 	}
-	return {}
+	return [{}, editorconfigSettings]
 }
 
 /**

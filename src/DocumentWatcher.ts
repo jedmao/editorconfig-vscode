@@ -9,6 +9,7 @@ import {
 	TextEditorOptions,
 	window,
 	workspace,
+	languages,
 } from 'vscode'
 import {
 	InsertFinalNewline,
@@ -24,6 +25,8 @@ import {
 	resolveFile,
 	resolveTextEditorOptions,
 } from './api'
+
+const failedLangs: string[] = []
 
 export default class DocumentWatcher {
 	private disposable: Disposable
@@ -45,17 +48,7 @@ export default class DocumentWatcher {
 		subscriptions.push(
 			window.onDidChangeActiveTextEditor(async editor => {
 				if (editor && editor.document) {
-					const newOptions = await resolveTextEditorOptions(
-						(this.doc = editor.document),
-						{
-							defaults: this.defaults,
-							onEmptyConfig: this.onEmptyConfig,
-						},
-					)
-					applyTextEditorOptions(newOptions, {
-						onNoActiveTextEditor: this.onNoActiveTextEditor,
-						onSuccess: this.onSuccess,
-					})
+					this.init((this.doc = editor.document))
 				}
 			}),
 		)
@@ -63,14 +56,7 @@ export default class DocumentWatcher {
 		subscriptions.push(
 			window.onDidChangeWindowState(async state => {
 				if (state.focused && this.doc) {
-					const newOptions = await resolveTextEditorOptions(this.doc, {
-						defaults: this.defaults,
-						onEmptyConfig: this.onEmptyConfig,
-					})
-					applyTextEditorOptions(newOptions, {
-						onNoActiveTextEditor: this.onNoActiveTextEditor,
-						onSuccess: this.onSuccess,
-					})
+					this.init(this.doc)
 				}
 			}),
 		)
@@ -110,6 +96,43 @@ export default class DocumentWatcher {
 
 		this.disposable = Disposable.from.apply(this, subscriptions)
 		this.onConfigChanged()
+	}
+
+	private async init(this: DocumentWatcher, doc: TextDocument) {
+		const [newOptions, editorconfigSettings] = await resolveTextEditorOptions(
+			doc,
+			{
+				defaults: this.defaults,
+				onEmptyConfig: this.onEmptyConfig,
+			},
+		)
+		applyTextEditorOptions(newOptions, {
+			onNoActiveTextEditor: this.onNoActiveTextEditor,
+			onSuccess: this.onSuccess,
+		})
+		if (editorconfigSettings.language) {
+			const langs = (editorconfigSettings.language as string)
+				.split(/\s*,\s*/)
+				.filter(Boolean)
+				.map(x => x.toLowerCase().trim())
+				.filter(x => !failedLangs.includes(x))
+			const originalId = doc.languageId
+			for (const lang of langs) {
+				if (lang === originalId) {
+					break
+				}
+				this.log('trying to set language:', lang)
+				try {
+					// eslint-disable-next-line no-await-in-loop
+					await languages.setTextDocumentLanguage(doc, lang)
+				} catch (err) {
+					this.log(err.message)
+					failedLangs.push(lang)
+					continue
+				}
+				this.log('success!')
+			}
+		}
 	}
 
 	public onEmptyConfig = (relativePath: string) => {
